@@ -11,9 +11,10 @@ df = pd.read_csv("data/processed/transactions_final.csv")
 
 # Smaller training sample
 
+
 df, _ = train_test_split(
     df,
-    train_size=50000,
+    train_size=20000,
     random_state=42,
     stratify=df["is_fraud"]
 )
@@ -41,6 +42,6 @@ model = GradientBoostingClassifier(
 model.fit(X, y)
 
 # Save model
-joblib.dump(model, "ml/fraud_model.pkl")
+joblib.dump(model, "deployment/fraud_model.pkl")
 
 print("✅ Model saved successfully!")

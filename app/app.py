@@ -33,7 +33,7 @@ df = load_data()
 # -----------------------------
 @st.cache_resource
 def load_model():
-    model = joblib.load("ml/fraud_model.pkl")
+    model = joblib.load("deployment/fraud_model.pkl")
     return model
 
 model = load_model()
