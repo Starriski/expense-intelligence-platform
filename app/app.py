@@ -13,12 +13,6 @@ st.set_page_config(
 )
 
 # -----------------------------
-# TITLE
-# -----------------------------
-st.title("💳 Expense Intelligence Platform")
-st.markdown("### AI-Powered Fraud Detection + Financial Analytics Dashboard")
-
-# -----------------------------
 # LOAD DATA
 # -----------------------------
 @st.cache_data
@@ -29,7 +23,7 @@ def load_data():
 df = load_data()
 
 # -----------------------------
-# LOAD TRAINED MODEL
+# LOAD MODEL
 # -----------------------------
 @st.cache_resource
 def load_model():
@@ -39,72 +33,72 @@ def load_model():
 model = load_model()
 
 # -----------------------------
+# PAGE TITLE
+# -----------------------------
+st.title("💳 Expense Intelligence Platform")
+
+st.markdown("""
+AI-powered fintech analytics dashboard for:
+- Fraud Detection
+- Customer Segmentation
+- Financial Intelligence Scoring
+""")
+
+# -----------------------------
 # SIDEBAR FILTERS
 # -----------------------------
 st.sidebar.header("🔍 Filters")
 
-category_filter = st.sidebar.multiselect(
-    "Select Category",
-    options=sorted(df["category"].dropna().unique())
-)
+if "category" in df.columns:
 
-if category_filter:
-    df = df[df["category"].isin(category_filter)]
+    categories = st.sidebar.multiselect(
+        "Select Categories",
+        options=df["category"].unique(),
+        default=df["category"].unique()
+    )
+
+    df = df[df["category"].isin(categories)]
 
 # -----------------------------
-# KPI SECTION
+# KPI METRICS
 # -----------------------------
 st.subheader("📊 Key Metrics")
 
-col1, col2, col3, col4 = st.columns(4)
+total_transactions = len(df)
+
+total_amount = df["amount"].sum()
+
+fraud_count = df["is_fraud"].sum()
+
+col1, col2, col3 = st.columns(3)
 
 col1.metric(
     "Total Transactions",
-    f"{len(df):,}"
+    f"{total_transactions:,}"
 )
 
 col2.metric(
-    "Fraud Cases",
-    f"{int(df['is_fraud'].sum()):,}"
+    "Total Spend",
+    f"${total_amount:,.2f}"
 )
-
-fraud_rate = round(df["is_fraud"].mean() * 100, 2)
 
 col3.metric(
-    "Fraud Rate %",
-    fraud_rate
-)
-
-col4.metric(
-    "Total Amount",
-    f"${df['amount'].sum():,.2f}"
+    "Fraud Transactions",
+    f"{fraud_count:,}"
 )
 
 # -----------------------------
-# TRANSACTION DATA
+# TRANSACTION PREVIEW
 # -----------------------------
-st.subheader("📄 Transaction Data Preview")
-
-preview_columns = [
-    col for col in [
-        "date",
-        "category",
-        "merchant",
-        "amount",
-        "city",
-        "state",
-        "is_fraud"
-    ]
-    if col in df.columns
-]
+st.subheader("🧾 Transaction Dataset Preview")
 
 st.dataframe(
-    df[preview_columns].head(100),
+    df.head(20),
     use_container_width=True
 )
 
 # -----------------------------
-# CATEGORY SPENDING
+# SPENDING BY CATEGORY
 # -----------------------------
 st.subheader("💰 Spending by Category")
 
@@ -133,7 +127,7 @@ if "category" in df.columns:
 # -----------------------------
 # FRAUD DISTRIBUTION
 # -----------------------------
-st.subheader("🚨 Fraud vs Normal Transactions")
+st.subheader("🚨 Fraud Distribution")
 
 fraud_counts = (
     df["is_fraud"]
@@ -165,72 +159,65 @@ st.plotly_chart(
 # -----------------------------
 # FRAUD PREDICTION TOOL
 # -----------------------------
-st.subheader("🧠 Live Fraud Prediction")
+st.subheader("🤖 Fraud Prediction Tool")
 
-st.markdown("Enter transaction details below to estimate fraud probability.")
-
-col1, col2, col3 = st.columns(3)
-
-amount = col1.number_input(
+amount = st.number_input(
     "Transaction Amount",
     min_value=0.0,
     value=100.0
 )
 
-city_pop = col2.number_input(
+city_pop = st.number_input(
     "City Population",
     min_value=0,
-    value=10000
+    value=50000
 )
 
-lat = col3.number_input(
-    "Customer Latitude",
+unix_time = st.number_input(
+    "Unix Time",
+    min_value=0,
+    value=1371816865
+)
+
+merchant_lat = st.number_input(
+    "Merchant Latitude",
     value=40.0
 )
 
-long = col1.number_input(
-    "Customer Longitude",
-    value=-75.0
-)
-
-merch_lat = col2.number_input(
-    "Merchant Latitude",
-    value=40.5
-)
-
-merch_long = col3.number_input(
+merchant_long = st.number_input(
     "Merchant Longitude",
-    value=-75.5
+    value=-73.0
 )
 
-# -----------------------------
-# PREDICTION
-# -----------------------------
+input_data = pd.DataFrame({
+    "amount": [amount],
+    "city_pop": [city_pop],
+    "unix_time": [unix_time],
+    "merch_lat": [merchant_lat],
+    "merch_long": [merchant_long]
+})
+
 if st.button("Predict Fraud Risk"):
 
-    input_data = np.array([
-        [
-            amount,
-            city_pop,
-            lat,
-            long,
-            merch_lat,
-            merch_long
-        ]
-    ])
+    prediction = model.predict(input_data)[0]
 
-    fraud_probability = model.predict_proba(input_data)[0][1]
+    probability = model.predict_proba(
+        input_data
+    )[0][1]
 
-    st.markdown(f"## 🔴 Fraud Probability: {fraud_probability:.2f}")
+    if prediction == 1:
 
-    if fraud_probability > 0.7:
-        st.error("⚠️ HIGH FRAUD RISK")
-
-    elif fraud_probability > 0.3:
-        st.warning("⚠️ MODERATE FRAUD RISK")
+        st.error(
+            f"⚠ Fraudulent Transaction Detected "
+            f"(Risk Score: {probability:.2f})"
+        )
 
     else:
-        st.success("✅ LOW FRAUD RISK")
+
+        st.success(
+            f"✅ Normal Transaction "
+            f"(Risk Score: {probability:.2f})"
+        )
 
 # -----------------------------
 # CUSTOMER SEGMENTATION
@@ -238,13 +225,7 @@ if st.button("Predict Fraud Risk"):
 st.subheader("👥 Customer Segmentation")
 
 segments_df = pd.read_csv(
-    "data/processed/customer_segments.csv"
-)
-
-segment_counts = (
-    segments_df["segment"]
-    .value_counts()
-    .sort_index()
+    "deployment/customer_segments.csv"
 )
 
 segment_chart = (
@@ -273,9 +254,49 @@ st.dataframe(
 )
 
 # -----------------------------
+# FINANCIAL HEALTH SCORES
+# -----------------------------
+st.subheader("💰 Financial Intelligence Scores")
+
+score_df = pd.read_csv(
+    "deployment/financial_scores.csv"
+)
+
+tier_chart = (
+    score_df["customer_tier"]
+    .value_counts()
+    .reset_index()
+)
+
+tier_chart.columns = ["Tier", "Users"]
+
+fig = px.funnel(
+    tier_chart,
+    x="Users",
+    y="Tier",
+    title="Customer Tier Distribution"
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
+
+top_customers = score_df.sort_values(
+    by="financial_score",
+    ascending=False
+).head(20)
+
+st.dataframe(
+    top_customers,
+    use_container_width=True
+)
+
+# -----------------------------
 # FOOTER
 # -----------------------------
 st.markdown("---")
+
 st.markdown(
-    "Built using Python, Streamlit, Scikit-learn, Pandas, and ML-based Fraud Analytics"
+    "Built with ❤️ using Streamlit, Machine Learning, and Plotly"
 )
